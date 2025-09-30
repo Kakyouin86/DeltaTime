@@ -1,6 +1,7 @@
 using UnityEngine;
 using Rewired;
 using Unity.VisualScripting;
+using UnityEditor.ShaderKeywordFilter;
 
 public class CarController : MonoBehaviour
 {
@@ -28,6 +29,12 @@ public class CarController : MonoBehaviour
     public Transform frontRightWheel;
     public float maxWheelTurn = 25f;
 
+    [Header("Dust Trail")]
+    public ParticleSystem[] dustTrail;
+    public float maxEmission = 25f;
+    public float emissionFadeSpeed = 50f;
+    public float emissionRate;
+
     [Header("Components")]
     public Rigidbody theRB;
     public Player player;
@@ -41,8 +48,9 @@ public class CarController : MonoBehaviour
             dragOnGround = theRB.linearDamping;
         }
         player = ReInput.players.GetPlayer(0);
-    }
 
+        emissionRate = dustTrail[0].emission.rateOverTime.constant;
+    }
 
     void Update()
     {
@@ -66,7 +74,26 @@ public class CarController : MonoBehaviour
 
         frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput) - 180, frontLeftWheel.localRotation.eulerAngles.z);
         frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput), frontRightWheel.localRotation.eulerAngles.z);
+        
         transform.position = theRB.transform.position;
+
+        emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
+
+        if (grounded && (Mathf.Abs(turnInput) > 0.5f || (theRB.linearVelocity.magnitude < maxSpeed * 0.5f && theRB.linearVelocity.magnitude != 0)))
+        {
+            emissionRate = maxEmission;
+        }
+
+        if (theRB.linearVelocity.magnitude  < 0.5f)
+        {
+            emissionRate = 0f;
+        }   
+
+        for (int i = 0; i < dustTrail.Length; i++)
+        {
+            var emissionModule = dustTrail[i].emission;
+            emissionModule.rateOverTime = emissionRate;
+        }
     }
 
     void FixedUpdate()

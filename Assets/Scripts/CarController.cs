@@ -67,15 +67,15 @@ public class CarController : MonoBehaviour
 
         turnInput = player.GetAxis("Horizontal");
 
-        if (player.GetAxis("Vertical") != 0)
+        /*if (player.GetAxis("Vertical") != 0)
         {
             transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0));
-        }
+        }*/
 
         frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput) - 180, frontLeftWheel.localRotation.eulerAngles.z);
         frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput), frontRightWheel.localRotation.eulerAngles.z);
         
-        transform.position = theRB.transform.position;
+        //transform.position = theRB.transform.position;
 
         emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
 
@@ -115,7 +115,8 @@ public class CarController : MonoBehaviour
             if (theRB != null)
             {
                 theRB.linearDamping = dragOnGround;
-                theRB.AddForce(transform.forward * speedInput * 1000);
+                //theRB.AddForce(transform.forward * speedInput * 1000);
+                theRB.AddForce(transform.forward * speedInput);
                 //Debug.Log(theRB.linearVelocity.magnitude);
             }
         }
@@ -125,13 +126,21 @@ public class CarController : MonoBehaviour
             if (theRB != null)
             {
                 theRB.linearDamping = 0.01f;
-                theRB.AddForce(-Vector3.up * gravityMod * 1000f);
+                //theRB.AddForce(-Vector3.up * gravityMod * 1000f);
+                theRB.AddForce(-Vector3.up * gravityMod);
             }
         }
 
         if (theRB != null && theRB.linearVelocity.magnitude > maxSpeed)
         {
             theRB.linearVelocity = theRB.linearVelocity.normalized * maxSpeed;
+        }
+
+        transform.position = theRB.transform.position;
+
+        if (player.GetAxis("Vertical") != 0)
+        {
+            transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0));
         }
     }
 

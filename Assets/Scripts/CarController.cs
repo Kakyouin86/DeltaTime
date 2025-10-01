@@ -1,7 +1,5 @@
 using UnityEngine;
 using Rewired;
-using Unity.VisualScripting;
-using UnityEditor.ShaderKeywordFilter;
 
 public class CarController : MonoBehaviour
 {
@@ -22,6 +20,7 @@ public class CarController : MonoBehaviour
 
     [Header("Air Control")]
     public float dragOnGround;
+    public float lowValueDrag = 0.1f;
     public float gravityMod = 10f;
 
     [Header("Wheels")]
@@ -65,21 +64,30 @@ public class CarController : MonoBehaviour
             speedInput = player.GetAxis("Vertical") * reverseAcceleration;
         }
 
-        turnInput = player.GetAxis("Horizontal");
-
-        /*if (player.GetAxis("Vertical") != 0)
-        {
-            transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0));
+        /*else
+        { 
+            theRB.transform.localPosition = Vector3.zero;
+            theRB.linearVelocity = Vector3.zero;
         }*/
 
-        frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput) - 180, frontLeftWheel.localRotation.eulerAngles.z);
-        frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput), frontRightWheel.localRotation.eulerAngles.z);
-        
-        //transform.position = theRB.transform.position;
+        turnInput = player.GetAxis("Horizontal");
+
+        if (player.GetAxis("Vertical") != 0)
+        {
+            transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0f, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0f));
+        }
+
+        frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn) - 180, frontLeftWheel.localRotation.eulerAngles.z);
+        //frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput) - 180, frontLeftWheel.localRotation.eulerAngles.z);
+
+        frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn), frontRightWheel.localRotation.eulerAngles.z);
+        //frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput), frontRightWheel.localRotation.eulerAngles.z);
+
+        //transform.position = theRB.position;
 
         emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
 
-        if (grounded && (Mathf.Abs(turnInput) > 0.5f || (theRB.linearVelocity.magnitude < maxSpeed * 0.5f && theRB.linearVelocity.magnitude != 0)))
+        if (grounded && (Mathf.Abs(turnInput) > .5f || (theRB.linearVelocity.magnitude < maxSpeed * .5f && theRB.linearVelocity.magnitude != 0)))
         {
             emissionRate = maxEmission;
         }
@@ -87,7 +95,7 @@ public class CarController : MonoBehaviour
         if (theRB.linearVelocity.magnitude  < 0.5f)
         {
             emissionRate = 0f;
-        }   
+        }
 
         for (int i = 0; i < dustTrail.Length; i++)
         {
@@ -96,52 +104,69 @@ public class CarController : MonoBehaviour
         }
     }
 
-    void FixedUpdate()
+    public void LateUpdate()
     {
+        transform.position = theRB.position;
+    }
+
+    public void FixedUpdate()
+    {
+        grounded = false;
+
         RaycastHit hit;
-        grounded = Physics.Raycast(groundRayPoint.position, -transform.up, out hit, groundRayLength, groundLayer);
         Vector3 normalTarget = Vector3.zero;
+
+        if (Physics.Raycast(groundRayPoint.position, -transform.up, out hit, groundRayLength, groundLayer))
+        {
+            grounded = true;
+
+            normalTarget = hit.normal;
+        }
 
         if (Physics.Raycast(angleRayPoint.position, -transform.up, out hit, groundRayLength, groundLayer))
         {
             grounded = true;
-            normalTarget = (normalTarget + hit.normal) / 2;
+
+            normalTarget = (normalTarget + hit.normal) / 2f;
         }
 
+        //when on ground rotate to match the normal
         if (grounded)
         {
-            normalTarget = hit.normal;
             transform.rotation = Quaternion.FromToRotation(transform.up, normalTarget) * transform.rotation;
-            if (theRB != null)
-            {
-                theRB.linearDamping = dragOnGround;
-                //theRB.AddForce(transform.forward * speedInput * 1000);
-                theRB.AddForce(transform.forward * speedInput);
-                //Debug.Log(theRB.linearVelocity.magnitude);
-            }
-        }
-        
-        else
-        {
-            if (theRB != null)
-            {
-                theRB.linearDamping = 0.01f;
-                //theRB.AddForce(-Vector3.up * gravityMod * 1000f);
-                theRB.AddForce(-Vector3.up * gravityMod);
-            }
         }
 
-        if (theRB != null && theRB.linearVelocity.magnitude > maxSpeed)
+        //accelerates the car
+        if (grounded)
+        {
+            theRB.linearDamping = dragOnGround;
+
+            theRB.AddForce(transform.forward * speedInput * 1000f);
+            //theRB.AddForce(transform.forward * speedInput * 1f);
+        }
+
+        else
+        {
+            theRB.linearDamping = lowValueDrag;
+
+            theRB.AddForce(-Vector3.up * gravityMod * 100f);
+        }
+
+        if (theRB.linearVelocity.magnitude > maxSpeed)
         {
             theRB.linearVelocity = theRB.linearVelocity.normalized * maxSpeed;
         }
 
-        transform.position = theRB.transform.position;
-
-        if (player.GetAxis("Vertical") != 0)
+        /*if (grounded && speedInput != 0)
         {
-            transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0));
+            transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0f, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0f));
         }
+
+        transform.position = theRB.position;*/
+
+        //Debug.Log("Magnitude: " + theRB.linearVelocity.magnitude);
+        //Debug.Log("Linear Velocity: " + theRB.linearVelocity);
+        //Debug.Log("Speed Input: " + speedInput);
     }
 
     void OnDrawGizmos()

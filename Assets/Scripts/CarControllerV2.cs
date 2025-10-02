@@ -1,6 +1,5 @@
 using Rewired;
 using UnityEngine;
-using static CarControllerV2;
 
 public class CarControllerV2 : MonoBehaviour
 {
@@ -90,7 +89,6 @@ public class CarControllerV2 : MonoBehaviour
         On
     }
 
-
     [Header("Debug Settings")]
     public DebugMode debugMode = DebugMode.Off;
 
@@ -159,8 +157,19 @@ public class CarControllerV2 : MonoBehaviour
     public float hoverFrequency = 1f;
     public float tiltAmount = 0.35f;
 
+    [Header("Checkpoint & Laps")]
+    public int nextCheckpoint;
+    public int currentLap;
+    public float lapTime;
+    public float bestLapTime;
+
+    [Header("Audio")]
+    public AudioSource engineSFX;
+    public AudioSource skidSoundSFX;
+    public float skidSFXFadeSpeed = 2f;
+
     [Header("Components")]
-    public Rigidbody rb;
+    public Rigidbody theRB;
     public float originalMass;
     public float originalLinearDamping;
     public float originalAngularDamping;
@@ -169,30 +178,32 @@ public class CarControllerV2 : MonoBehaviour
     void Awake()
     {
         player = ReInput.players.GetPlayer(playerId);
-        rb = GetComponent<Rigidbody>();
-        originalMass = rb.mass;
-        originalLinearDamping = rb.linearDamping;
-        originalAngularDamping = rb.angularDamping;
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        theRB = GetComponent<Rigidbody>();
+        originalMass = theRB.mass;
+        originalLinearDamping = theRB.linearDamping;
+        originalAngularDamping = theRB.angularDamping;
+        theRB.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
         if (meshTransform != null)
             meshBaseLocalPos = meshTransform.localPosition;
+
+        UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
     }
 
     void FixedUpdate()
     {
-        currentSpeed = rb.linearVelocity.magnitude;
+        currentSpeed = theRB.linearVelocity.magnitude;
 
         GroundCheck();
 
         if (isGrounded)
         {
-            rb.linearDamping = originalLinearDamping;
+            theRB.linearDamping = originalLinearDamping;
         }
         else
         {
             // --- Air control ---
-            rb.linearDamping = airDrag;
-            rb.AddForce(Vector3.down * airGravity * rb.mass, ForceMode.Force);
+            theRB.linearDamping = airDrag;
+            theRB.AddForce(Vector3.down * airGravity * theRB.mass, ForceMode.Force);
         }
 
         if (!isGrounded) return;
@@ -205,11 +216,11 @@ public class CarControllerV2 : MonoBehaviour
         Vector3 forwardForce = transform.forward * moveInput * acceleration * Time.fixedDeltaTime;
 
         // --- Torque Debug ---
-        Vector3 forcePoint = rb.position; // default center
+        Vector3 forcePoint = theRB.position; // default center
         if (driveType == DriveType.FrontWheel && frontForcePoint != null) forcePoint = frontForcePoint.position;
         if (driveType == DriveType.RearWheel && rearForcePoint != null) forcePoint = rearForcePoint.position;
 
-        Vector3 torque = Vector3.Cross(forcePoint - rb.worldCenterOfMass, forwardForce);
+        Vector3 torque = Vector3.Cross(forcePoint - theRB.worldCenterOfMass, forwardForce);
 
         if (debugMode == DebugMode.On)
         {
@@ -221,39 +232,39 @@ public class CarControllerV2 : MonoBehaviour
         switch (driveType)
         {
             case DriveType.Center:
-                rb.AddForce(forwardForce);
+                theRB.AddForce(forwardForce);
                 break;
             case DriveType.FrontWheel:
                 if (frontForcePoint != null)
-                    rb.AddForceAtPosition(forwardForce, frontForcePoint.position);
+                    theRB.AddForceAtPosition(forwardForce, frontForcePoint.position);
                 else
-                    rb.AddForce(forwardForce); // fallback
+                    theRB.AddForce(forwardForce); // fallback
                 break;
             case DriveType.RearWheel:
                 if (rearForcePoint != null)
-                    rb.AddForceAtPosition(forwardForce, rearForcePoint.position);
+                    theRB.AddForceAtPosition(forwardForce, rearForcePoint.position);
                 else
-                    rb.AddForce(forwardForce); // fallback
+                    theRB.AddForce(forwardForce); // fallback
                 break;
         }
 
         // --- Regular Brake ---
-        if (brakeInput && rb.linearVelocity.sqrMagnitude > 0.01f) // Solo si estamos moviéndonos
+        if (brakeInput && theRB.linearVelocity.sqrMagnitude > 0.01f) // Solo si estamos moviéndonos
         {
             float factor = brakeMode == BrakeMode.Normal ? 1f : softBrakeFactor;
-            Vector3 brake = -rb.linearVelocity.normalized * brakeForce * factor * Time.fixedDeltaTime;
-            rb.AddForce(brake);
+            Vector3 brake = -theRB.linearVelocity.normalized * brakeForce * factor * Time.fixedDeltaTime;
+            theRB.AddForce(brake);
         }
 
         // --- Handbrake (rear wheels only) ---
         bool handbrakeInput = player.GetButton("Handbrake");
-        if (handbrakeInput && rearForcePoint != null && rb.linearVelocity.sqrMagnitude > 0.01f)
+        if (handbrakeInput && rearForcePoint != null && theRB.linearVelocity.sqrMagnitude > 0.01f)
         {
-            Vector3 rearVel = rb.GetPointVelocity(rearForcePoint.position);
+            Vector3 rearVel = theRB.GetPointVelocity(rearForcePoint.position);
             if (rearVel.sqrMagnitude > 0.01f)
             {
                 Vector3 rearBrakeForce = -rearVel.normalized * brakeForce * 1.2f * Time.fixedDeltaTime;
-                rb.AddForceAtPosition(rearBrakeForce, rearForcePoint.position);
+                theRB.AddForceAtPosition(rearBrakeForce, rearForcePoint.position);
             }
         }
 
@@ -267,50 +278,50 @@ public class CarControllerV2 : MonoBehaviour
             float stepOffset = maxStepHeight - stepHit.distance;
             if (stepOffset > 0f)
             {
-                rb.position += Vector3.up * stepOffset;
+                theRB.position += Vector3.up * stepOffset;
             }
         }
 
         // --- Limit speed ---
-        if (rb.linearVelocity.magnitude > maxSpeed)
+        if (theRB.linearVelocity.magnitude > maxSpeed)
         {
-            rb.linearVelocity = rb.linearVelocity.normalized * maxSpeed;
+            theRB.linearVelocity = theRB.linearVelocity.normalized * maxSpeed;
         }
 
         // --- Steering ---
-        float forwardVel = Vector3.Dot(rb.linearVelocity, transform.forward);
+        float forwardVel = Vector3.Dot(theRB.linearVelocity, transform.forward);
         float directionSign = Mathf.Sign(forwardVel);
-        float speedFactor = Mathf.Clamp01(rb.linearVelocity.magnitude / inertiaFactor);
+        float speedFactor = Mathf.Clamp01(theRB.linearVelocity.magnitude / inertiaFactor);
 
         switch (steeringMode)
         {
             case SteeringMode.Simple:
-                if (rb.linearVelocity.magnitude > 1f && Mathf.Abs(moveInput) > 0f)
+                if (theRB.linearVelocity.magnitude > 1f && Mathf.Abs(moveInput) > 0f)
                 {
                     float turn = turnInputLocal * turnSpeed * Time.fixedDeltaTime;
-                    rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, turn, 0f));
+                    theRB.MoveRotation(theRB.rotation * Quaternion.Euler(0f, turn, 0f));
                 }
                 break;
 
             case SteeringMode.WithInertia:
-                if (rb.linearVelocity.sqrMagnitude > 0.01f)
+                if (theRB.linearVelocity.sqrMagnitude > 0.01f)
                 {
                     float turn = turnInputLocal * turnSpeed * Time.fixedDeltaTime * speedFactor * directionSign;
-                    rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, turn, 0f));
+                    theRB.MoveRotation(theRB.rotation * Quaternion.Euler(0f, turn, 0f));
                 }
                 break;
 
             case SteeringMode.SpeedScaled:
-                if (rb.linearVelocity.sqrMagnitude > 0.01f)
+                if (theRB.linearVelocity.sqrMagnitude > 0.01f)
                 {
                     float turn = turnInputLocal * maxSpeed * Time.fixedDeltaTime * speedFactor * directionSign;
-                    rb.MoveRotation(rb.rotation * Quaternion.Euler(0f, turn, 0f));
+                    theRB.MoveRotation(theRB.rotation * Quaternion.Euler(0f, turn, 0f));
                 }
                 break;
         }
 
         // --- Lateral friction ---
-        Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
+        Vector3 localVel = transform.InverseTransformDirection(theRB.linearVelocity);
         switch (lateralFrictionMode)
         {
             case LateralFrictionMode.Clamp50Percent:
@@ -322,7 +333,7 @@ public class CarControllerV2 : MonoBehaviour
             case LateralFrictionMode.None:
                 break;
         }
-        rb.linearVelocity = transform.TransformDirection(localVel);
+        theRB.linearVelocity = transform.TransformDirection(localVel);
     }
 
     void LateUpdate()
@@ -356,6 +367,11 @@ public class CarControllerV2 : MonoBehaviour
 
     void Update()
     {
+        lapTime += Time.deltaTime;
+
+        var ts = System.TimeSpan.FromSeconds(lapTime);
+        UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
+
         // --- Calculate movement from position ---
         Vector3 deltaPos = transform.position - lastPosition;
         float movedDistance = deltaPos.magnitude;
@@ -396,6 +412,38 @@ public class CarControllerV2 : MonoBehaviour
                 turnInput * maxWheelTurn,
                 frontRightWheel.localRotation.eulerAngles.z
             );
+
+        // --- SFX Sound ---
+        if (engineSFX != null)
+        {
+            engineSFX.pitch = 1f + ((theRB.linearVelocity.magnitude / maxSpeed) * 1.5f);
+        }
+
+        if (skidSoundSFX != null)
+        {
+            if (isGrounded && Mathf.Abs(turnInput) > 0.5f && theRB.linearVelocity.magnitude >= .5f)
+            {
+                if (!skidSoundSFX.isPlaying)
+                {
+                    skidSoundSFX.Play();
+                }
+                skidSoundSFX.volume = 1f;
+            }
+
+            else
+            {
+                skidSoundSFX.volume = Mathf.MoveTowards(
+                    skidSoundSFX.volume,
+                    0f,
+                    skidSFXFadeSpeed * Time.deltaTime
+                );
+
+                /*if (skidSoundSFX.volume <= 0.01f)
+                {
+                    skidSoundSFX.Stop();
+                }*/
+            }
+        }
     }
 
     void GroundCheck()
@@ -437,10 +485,10 @@ public class CarControllerV2 : MonoBehaviour
         }
 
         // --- Center force ---
-        if (rb != null && driveType == DriveType.Center)
+        if (theRB != null && driveType == DriveType.Center)
         {
             Gizmos.color = Color.cyan;
-            Gizmos.DrawLine(rb.position, rb.position + transform.forward * 2f);
+            Gizmos.DrawLine(theRB.position, theRB.position + transform.forward * 2f);
         }
 
         // --- Step-Up Gizmo ---
@@ -448,5 +496,35 @@ public class CarControllerV2 : MonoBehaviour
         Vector3 stepOrigin = transform.position + Vector3.up * stepOriginHeight;
         Vector3 forwardOffset = transform.forward * forwardCheckDistance;
         Gizmos.DrawLine(stepOrigin + forwardOffset, stepOrigin + forwardOffset - transform.up * maxStepHeight);
+    }
+
+    public void CheckpointHit(int cpNumber)
+    {
+        if (cpNumber == nextCheckpoint)
+        {
+            nextCheckpoint++;
+
+            if (nextCheckpoint == RaceManager.instance.allCheckpoints.Length)
+            {
+                nextCheckpoint = 0;
+                LapCompleted();
+            }
+        }
+    }
+
+    public void LapCompleted()
+    {
+        currentLap++;
+
+        if (lapTime < bestLapTime || bestLapTime == 0)
+        {
+            bestLapTime = lapTime;
+        }
+
+        lapTime = 0f;
+
+        var ts = System.TimeSpan.FromSeconds(bestLapTime);
+        UIManager.instance.bestLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
+        UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
     }
 }

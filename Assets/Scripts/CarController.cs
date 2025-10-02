@@ -34,6 +34,17 @@ public class CarController : MonoBehaviour
     public float emissionFadeSpeed = 50f;
     public float emissionRate;
 
+    [Header("Checkpoint & Laps")]
+    public int nextCheckpoint;
+    public int currentLap;
+    public float lapTime;
+    public float bestLapTime;
+
+    [Header("Audio")]
+    public AudioSource engineSFX;
+    public AudioSource skidSoundSFX;
+    public float skidSFXFadeSpeed;
+
     [Header("Components")]
     public Rigidbody theRB;
     public Player player;
@@ -49,10 +60,17 @@ public class CarController : MonoBehaviour
         player = ReInput.players.GetPlayer(0);
 
         emissionRate = dustTrail[0].emission.rateOverTime.constant;
+
+        UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
     }
 
     void Update()
     {
+        lapTime += Time.deltaTime;
+
+        var ts = System.TimeSpan.FromSeconds(lapTime);
+        UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
+
         speedInput = 0;
         if (player.GetAxis("Vertical") > 0)
         {
@@ -101,6 +119,37 @@ public class CarController : MonoBehaviour
         {
             var emissionModule = dustTrail[i].emission;
             emissionModule.rateOverTime = emissionRate;
+        }
+
+        if (engineSFX != null)
+        {
+            engineSFX.pitch = 1f + ((theRB.linearVelocity.magnitude / maxSpeed) * 1.5f);
+        }
+
+        if (skidSoundSFX != null)
+        {
+            if (grounded && Mathf.Abs(turnInput) > 0.5f && theRB.linearVelocity.magnitude >= .5f)
+            {
+                if (!skidSoundSFX.isPlaying)
+                {
+                    skidSoundSFX.Play();
+                }
+                skidSoundSFX.volume = 1f;
+            }
+
+            else
+            {
+                skidSoundSFX.volume = Mathf.MoveTowards(
+                    skidSoundSFX.volume,
+                    0f,
+                    skidSFXFadeSpeed * Time.deltaTime
+                );
+
+                /*if (skidSoundSFX.volume <= 0.01f)
+                {
+                    skidSoundSFX.Stop();
+                }*/
+            }
         }
     }
 
@@ -176,5 +225,35 @@ public class CarController : MonoBehaviour
             Gizmos.color = Color.red;
             Gizmos.DrawLine(groundRayPoint.position, groundRayPoint.position - transform.up * groundRayLength);
         }
+    }
+
+    public void CheckpointHit(int cpNumber)
+    {
+        if (cpNumber == nextCheckpoint)
+        {
+            nextCheckpoint++;
+
+            if (nextCheckpoint == RaceManager.instance.allCheckpoints.Length)
+            {
+                nextCheckpoint = 0;
+                LapCompleted();
+            }
+        }
+    }
+
+    public void LapCompleted()
+    {
+        currentLap++;
+
+        if (lapTime < bestLapTime || bestLapTime == 0)
+        {
+            bestLapTime = lapTime;
+        }
+
+        lapTime = 0f;
+
+        var ts = System.TimeSpan.FromSeconds(bestLapTime);
+        UIManager.instance.bestLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
+        UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
     }
 }

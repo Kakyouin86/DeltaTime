@@ -159,7 +159,7 @@ public class CarControllerV2 : MonoBehaviour
 
     [Header("Checkpoint & Laps")]
     public int nextCheckpoint;
-    public int currentLap;
+    public int currentLap = 1;
     public float lapTime;
     public float bestLapTime;
 

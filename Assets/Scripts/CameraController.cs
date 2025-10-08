@@ -9,6 +9,7 @@ public class CameraController : MonoBehaviour
     public float minDistance = 20f;
     public float maxDistance = 50f;
     public float activeDistance = 10f;
+    public Transform startTargetOffset;
 
     void Start()
     {
@@ -21,7 +22,7 @@ public class CameraController : MonoBehaviour
 
         if (theCarController != null)
         {
-            offsetDirectionCont1 = transform.position - theCarController.transform.position;
+            offsetDirectionCont1 = transform.position - startTargetOffset.transform.position;
         }
 
         theCarControllerV2 = FindFirstObjectByType<CarControllerV2>();
@@ -33,7 +34,7 @@ public class CameraController : MonoBehaviour
 
         if (theCarControllerV2 != null)
         {
-            offsetDirectionCont2 = transform.position - theCarControllerV2.transform.position;
+            offsetDirectionCont2 = transform.position - startTargetOffset.transform.position;
         }
 
         activeDistance = minDistance;

@@ -3,6 +3,7 @@ using Rewired;
 
 public class CarController : MonoBehaviour
 {
+    public bool isAI = false;
     [Header("Speed & Torque")]
     public float maxSpeed = 30f;
     public float speedInput;
@@ -36,7 +37,7 @@ public class CarController : MonoBehaviour
 
     [Header("Checkpoint & Laps")]
     public int nextCheckpoint;
-    public int currentLap;
+    public int currentLap = 1;
     public float lapTime;
     public float bestLapTime;
 
@@ -68,31 +69,34 @@ public class CarController : MonoBehaviour
     {
         lapTime += Time.deltaTime;
 
-        var ts = System.TimeSpan.FromSeconds(lapTime);
-        UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
-
-        speedInput = 0;
-        if (player.GetAxis("Vertical") > 0)
+        if (!isAI)
         {
-            speedInput = player.GetAxis("Vertical") * forwardAcceleration;
-        }
+            var ts = System.TimeSpan.FromSeconds(lapTime);
+            UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
 
-        else if (player.GetAxis("Vertical") < 0)
-        {
-            speedInput = player.GetAxis("Vertical") * reverseAcceleration;
-        }
+            speedInput = 0;
+            if (player.GetAxis("Vertical") > 0)
+            {
+                speedInput = player.GetAxis("Vertical") * forwardAcceleration;
+            }
 
-        /*else
-        { 
-            theRB.transform.localPosition = Vector3.zero;
-            theRB.linearVelocity = Vector3.zero;
-        }*/
+            else if (player.GetAxis("Vertical") < 0)
+            {
+                speedInput = player.GetAxis("Vertical") * reverseAcceleration;
+            }
 
-        turnInput = player.GetAxis("Horizontal");
+            /*else
+            { 
+                theRB.transform.localPosition = Vector3.zero;
+                theRB.linearVelocity = Vector3.zero;
+            }*/
 
-        if (player.GetAxis("Vertical") != 0)
-        {
-            transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0f, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0f));
+            turnInput = player.GetAxis("Horizontal");
+
+            if (player.GetAxis("Vertical") != 0)
+            {
+                transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0f, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0f));
+            }
         }
 
         frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn) - 180, frontLeftWheel.localRotation.eulerAngles.z);
@@ -252,8 +256,11 @@ public class CarController : MonoBehaviour
 
         lapTime = 0f;
 
+        if (!isAI)
+        {
         var ts = System.TimeSpan.FromSeconds(bestLapTime);
         UIManager.instance.bestLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
         UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
+        }
     }
 }

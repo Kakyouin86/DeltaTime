@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: be4873a7717897945b107ab73dea1a68
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 288153
+  packageName: Snow Skyboxes - Skybox Pack
+  packageVersion: 1.0
+  assetPath: Assets/Skybox/Scripts/CameraRotate.cs
+  uploadId: 672072

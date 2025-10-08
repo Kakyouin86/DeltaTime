@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 8e27d429e9c660a4585bd91cdb545971
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 288153
+  packageName: Snow Skyboxes - Skybox Pack
+  packageVersion: 1.0
+  assetPath: Assets/Skybox/Scripts/SkyboxChanger.cs
+  uploadId: 672072

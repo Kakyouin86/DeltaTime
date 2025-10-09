@@ -1,4 +1,5 @@
 using Rewired;
+using System.Threading;
 using UnityEngine;
 
 public class CarControllerV2 : MonoBehaviour
@@ -88,6 +89,8 @@ public class CarControllerV2 : MonoBehaviour
         /// <summary>Debugging enabled.</summary>
         On
     }
+    [Header("AI")]
+    public GameObject theAI;
 
     [Header("Debug Settings")]
     public DebugMode debugMode = DebugMode.Off;
@@ -186,7 +189,8 @@ public class CarControllerV2 : MonoBehaviour
         if (meshTransform != null)
             meshBaseLocalPos = meshTransform.localPosition;
 
-        UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
+        //UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
+        UIManager.instance.lapCounterText.text = currentLap.ToString();
     }
 
     void FixedUpdate()
@@ -367,6 +371,11 @@ public class CarControllerV2 : MonoBehaviour
 
     void Update()
     {
+        if (player.GetButton("Enable AI") && theAI != null)
+        {
+            theAI.SetActive(true);
+        }
+
         lapTime += Time.deltaTime;
 
         var ts = System.TimeSpan.FromSeconds(lapTime);
@@ -525,6 +534,7 @@ public class CarControllerV2 : MonoBehaviour
 
         var ts = System.TimeSpan.FromSeconds(bestLapTime);
         UIManager.instance.bestLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
-        UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
+        //UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
+        UIManager.instance.lapCounterText.text = currentLap.ToString();
     }
 }

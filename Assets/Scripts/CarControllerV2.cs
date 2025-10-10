@@ -1,5 +1,4 @@
 using Rewired;
-using System.Threading;
 using UnityEngine;
 
 public class CarControllerV2 : MonoBehaviour
@@ -166,17 +165,26 @@ public class CarControllerV2 : MonoBehaviour
     public float lapTime;
     public float bestLapTime;
 
+    [Header("Reset To Track")]
+    public float resetCooldown = 2f;
+    public float resetCounter;
+
     [Header("Audio")]
     public AudioSource engineSFX;
     public AudioSource skidSoundSFX;
     public float skidSFXFadeSpeed = 2f;
 
     [Header("Components")]
+    public GameObject theMesh;
     public Rigidbody theRB;
     public float originalMass;
     public float originalLinearDamping;
     public float originalAngularDamping;
     public Vector3 meshBaseLocalPos;
+
+    public float moveInput; // W/S
+    public float turnInputLocal; // A/D
+    public bool brakeInput;
 
     void Awake()
     {
@@ -191,6 +199,7 @@ public class CarControllerV2 : MonoBehaviour
 
         //UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
         UIManager.instance.lapCounterText.text = currentLap.ToString();
+        resetCounter = resetCooldown;
     }
 
     void FixedUpdate()
@@ -203,6 +212,7 @@ public class CarControllerV2 : MonoBehaviour
         {
             theRB.linearDamping = originalLinearDamping;
         }
+
         else
         {
             // --- Air control ---
@@ -210,11 +220,11 @@ public class CarControllerV2 : MonoBehaviour
             theRB.AddForce(Vector3.down * airGravity * theRB.mass, ForceMode.Force);
         }
 
-        if (!isGrounded) return;
+        if (!isGrounded || RaceManager.instance.isStarting) return;
 
-        float moveInput = player.GetAxis("Vertical"); // W/S
-        float turnInputLocal = player.GetAxis("Horizontal"); // A/D
-        bool brakeInput = player.GetButton("Brake");
+        moveInput = player.GetAxis("Vertical"); // W/S
+        turnInputLocal = player.GetAxis("Horizontal"); // A/D
+        brakeInput = player.GetButton("Brake");
 
         // --- Calculate forward force ---
         Vector3 forwardForce = transform.forward * moveInput * acceleration * Time.fixedDeltaTime;
@@ -376,81 +386,100 @@ public class CarControllerV2 : MonoBehaviour
             theAI.SetActive(true);
         }
 
-        lapTime += Time.deltaTime;
-
-        var ts = System.TimeSpan.FromSeconds(lapTime);
-        UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
-
-        // --- Calculate movement from position ---
-        Vector3 deltaPos = transform.position - lastPosition;
-        float movedDistance = deltaPos.magnitude;
-        bool isMoving = movedDistance > 0.01f;
-        lastPosition = transform.position;
-
-        float turnInput = player.GetAxis("Horizontal");
-        bool slowingDown = isMoving && movedDistance < lastMovedDistance;
-        lastMovedDistance = movedDistance;
-
-        if (debugMode == DebugMode.On)
+        if (!RaceManager.instance.isStarting)
         {
-            Debug.Log($"Grounded: {isGrounded} | TurnInput: {turnInput:F2} | Moved: {movedDistance:F3} | SlowingDown: {slowingDown}");
-        }
-
-        // --- DustTrail logic ---
-        if (isGrounded && (Mathf.Abs(turnInput) > 0.5f || slowingDown) && isMoving)
-            emissionRate = maxEmission;
-        else
-            emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
-
-        for (int i = 0; i < dustTrail.Length; i++)
-        {
-            var emissionModule = dustTrail[i].emission;
-            emissionModule.rateOverTime = emissionRate;
-        }
-
-        // --- Wheels rotation ---
-        if (frontLeftWheel != null)
-            frontLeftWheel.localRotation = Quaternion.Euler(
-                frontLeftWheel.localRotation.eulerAngles.x,
-                (turnInput * maxWheelTurn) - 180,
-                frontLeftWheel.localRotation.eulerAngles.z
-            );
-        if (frontRightWheel != null)
-            frontRightWheel.localRotation = Quaternion.Euler(
-                frontRightWheel.localRotation.eulerAngles.x,
-                turnInput * maxWheelTurn,
-                frontRightWheel.localRotation.eulerAngles.z
-            );
-
-        // --- SFX Sound ---
-        if (engineSFX != null)
-        {
-            engineSFX.pitch = 1f + ((theRB.linearVelocity.magnitude / maxSpeed) * 1.5f);
-        }
-
-        if (skidSoundSFX != null)
-        {
-            if (isGrounded && Mathf.Abs(turnInput) > 0.5f && theRB.linearVelocity.magnitude >= .5f)
+            if (resetCounter > 0)
             {
-                if (!skidSoundSFX.isPlaying)
-                {
-                    skidSoundSFX.Play();
-                }
-                skidSoundSFX.volume = 1f;
+                resetCounter -= Time.deltaTime;
             }
 
-            else
+            if (player.GetButton("Reset") && resetCounter <= 0)
             {
-                skidSoundSFX.volume = Mathf.MoveTowards(
-                    skidSoundSFX.volume,
-                    0f,
-                    skidSFXFadeSpeed * Time.deltaTime
+                if (theMesh != null)
+                {
+                    theMesh.transform.localPosition = Vector3.zero;
+                    theMesh.transform.localRotation = Quaternion.identity;
+                }
+
+                ResetToTrack();
+            }
+
+            lapTime += Time.deltaTime;
+
+            var ts = System.TimeSpan.FromSeconds(lapTime);
+            UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
+
+            // --- Calculate movement from position ---
+            Vector3 deltaPos = transform.position - lastPosition;
+            float movedDistance = deltaPos.magnitude;
+            bool isMoving = movedDistance > 0.01f;
+            lastPosition = transform.position;
+
+            float turnInput = player.GetAxis("Horizontal");
+            bool slowingDown = isMoving && movedDistance < lastMovedDistance;
+            lastMovedDistance = movedDistance;
+
+            if (debugMode == DebugMode.On)
+            {
+                Debug.Log($"Grounded: {isGrounded} | TurnInput: {turnInput:F2} | Moved: {movedDistance:F3} | SlowingDown: {slowingDown}");
+            }
+
+            // --- DustTrail logic ---
+            if (isGrounded && (Mathf.Abs(turnInput) > 0.5f || slowingDown) && isMoving)
+                emissionRate = maxEmission;
+            else
+                emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
+
+            for (int i = 0; i < dustTrail.Length; i++)
+            {
+                var emissionModule = dustTrail[i].emission;
+                emissionModule.rateOverTime = emissionRate;
+            }
+
+            // --- Wheels rotation ---
+            if (frontLeftWheel != null)
+                frontLeftWheel.localRotation = Quaternion.Euler(
+                    frontLeftWheel.localRotation.eulerAngles.x,
+                    (turnInput * maxWheelTurn) - 180,
+                    frontLeftWheel.localRotation.eulerAngles.z
+                );
+            if (frontRightWheel != null)
+                frontRightWheel.localRotation = Quaternion.Euler(
+                    frontRightWheel.localRotation.eulerAngles.x,
+                    turnInput * maxWheelTurn,
+                    frontRightWheel.localRotation.eulerAngles.z
                 );
 
-                /*if (skidSoundSFX.volume <= 0.01f)
+            // --- SFX Sound ---
+            if (engineSFX != null)
+            {
+                engineSFX.pitch = 1f + ((theRB.linearVelocity.magnitude / maxSpeed) * 1.5f);
+            }
+
+            if (skidSoundSFX != null)
+            {
+                if (isGrounded && Mathf.Abs(turnInput) > 0.5f && theRB.linearVelocity.magnitude >= .5f)
                 {
-                    skidSoundSFX.Stop();
-                }*/
+                    if (!skidSoundSFX.isPlaying)
+                    {
+                        skidSoundSFX.Play();
+                    }
+                    skidSoundSFX.volume = 1f;
+                }
+
+                else
+                {
+                    skidSoundSFX.volume = Mathf.MoveTowards(
+                        skidSoundSFX.volume,
+                        0f,
+                        skidSFXFadeSpeed * Time.deltaTime
+                    );
+
+                    /*if (skidSoundSFX.volume <= 0.01f)
+                    {
+                        skidSoundSFX.Stop();
+                    }*/
+                }
             }
         }
     }
@@ -536,5 +565,23 @@ public class CarControllerV2 : MonoBehaviour
         UIManager.instance.bestLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
         //UIManager.instance.lapCounterText.text = currentLap + "/" + RaceManager.instance.totalLaps;
         UIManager.instance.lapCounterText.text = currentLap.ToString();
+    }
+
+    public void ResetToTrack()
+    {
+        int pointToGoTo = nextCheckpoint - 1;
+        if (pointToGoTo < 0)
+        {
+            pointToGoTo = RaceManager.instance.allCheckpoints.Length - 1;
+        }
+
+        transform.position = RaceManager.instance.allCheckpoints[pointToGoTo].transform.position;
+        theRB.transform.position = transform.position;
+        theRB.linearVelocity = Vector3.zero;
+
+        moveInput = 0f;
+        turnInputLocal = 0f;
+
+        resetCounter = resetCooldown;
     }
 }

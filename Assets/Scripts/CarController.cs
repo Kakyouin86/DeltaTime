@@ -17,8 +17,6 @@ public class CarController : MonoBehaviour
     public float aiSpeedMod;
     public float forwardAccel = 8f;
     public float reverseAccel = 4f;
-    public float resetCooldown = 2f;
-    public float resetCounter;
 
     [Header("Speed & Torque")]
     public float maxSpeed = 30f;
@@ -56,6 +54,10 @@ public class CarController : MonoBehaviour
     public int currentLap = 1;
     public float lapTime;
     public float bestLapTime;
+
+    [Header("Reset To Track")]
+    public float resetCooldown = 2f;
+    public float resetCounter;
 
     [Header("Audio")]
     public AudioSource engineSFX;
@@ -101,136 +103,139 @@ public class CarController : MonoBehaviour
             theAI.SetActive(true);
         }
 
-        lapTime += Time.deltaTime;
-
-        if (!isAI)
+        if (!RaceManager.instance.isStarting)
         {
-            var ts = System.TimeSpan.FromSeconds(lapTime);
-            UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
-            speedInput = 0;
+            lapTime += Time.deltaTime;
 
-            if (player.GetAxis("Vertical") > 0)
+            if (!isAI)
             {
-                speedInput = player.GetAxis("Vertical") * forwardAcceleration;
-            }
+                var ts = System.TimeSpan.FromSeconds(lapTime);
+                UIManager.instance.currentLapTimeText.text = string.Format("{0:00}m{1:00}.{2:000}s", ts.Minutes, ts.Seconds, ts.Milliseconds);
+                speedInput = 0;
 
-            else if (player.GetAxis("Vertical") < 0)
-            {
-                speedInput = player.GetAxis("Vertical") * reverseAcceleration;
-            }
-
-            /*else
-            { 
-                theRB.transform.localPosition = Vector3.zero;
-                theRB.linearVelocity = Vector3.zero;
-            }*/
-
-            turnInput = player.GetAxis("Horizontal");
-
-            /*if (player.GetAxis("Vertical") != 0)
-            {
-                transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0f, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0f));
-            }*/
-
-            if (resetCounter > 0)
-            {
-                resetCounter -= Time.deltaTime;
-            }
-
-            if (player.GetButton("Reset") && resetCounter <= 0)
-            {
-                ResetToTrack();
-            }
-        }
-
-        else
-        {
-            targetPoint.y = transform.position.y;
-
-            if (Vector3.Distance(transform.position, targetPoint) < aiReachPointRange)
-            {
-                SetNextAITarget();
-            }
-
-            Vector3 targetDir = targetPoint - transform.position;
-            float angle = Vector3.Angle(targetDir, transform.forward);
-
-            Vector3 localPos = transform.InverseTransformPoint(targetPoint);
-
-            if (localPos.x < 0f)
-            {
-                angle = -angle;
-            }
-
-            turnInput = Mathf.Clamp(angle / aiMaxTurn, -1f, 1f);
-
-            if (Mathf.Abs(angle) < aiMaxTurn)
-            {
-                aiSpeedInput = Mathf.MoveTowards(aiSpeedInput, 1f, aiAccelerateSpeed);
-            }
-
-            else
-            {
-                aiSpeedInput = Mathf.MoveTowards(aiSpeedInput, aiTurnSpeed, aiAccelerateSpeed);
-            }
-
-            speedInput = aiSpeedInput * forwardAccel * aiSpeedMod;
-        }
-
-        frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn) - 180, frontLeftWheel.localRotation.eulerAngles.z);
-        //frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput) - 180, frontLeftWheel.localRotation.eulerAngles.z);
-
-        frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn), frontRightWheel.localRotation.eulerAngles.z);
-        //frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput), frontRightWheel.localRotation.eulerAngles.z);
-
-        //transform.position = theRB.position;
-
-        emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
-
-        if (grounded && (Mathf.Abs(turnInput) > .5f || (theRB.linearVelocity.magnitude < maxSpeed * .5f && theRB.linearVelocity.magnitude != 0)))
-        {
-            emissionRate = maxEmission;
-        }
-
-        if (theRB.linearVelocity.magnitude  < 0.5f)
-        {
-            emissionRate = 0f;
-        }
-
-        for (int i = 0; i < dustTrail.Length; i++)
-        {
-            var emissionModule = dustTrail[i].emission;
-            emissionModule.rateOverTime = emissionRate;
-        }
-
-        if (engineSFX != null)
-        {
-            engineSFX.pitch = 1f + ((theRB.linearVelocity.magnitude / maxSpeed) * 1.5f);
-        }
-
-        if (skidSoundSFX != null)
-        {
-            if (grounded && Mathf.Abs(turnInput) > 0.5f && theRB.linearVelocity.magnitude >= .5f)
-            {
-                if (!skidSoundSFX.isPlaying)
+                if (player.GetAxis("Vertical") > 0)
                 {
-                    skidSoundSFX.Play();
+                    speedInput = player.GetAxis("Vertical") * forwardAcceleration;
                 }
-                skidSoundSFX.volume = 1f;
+
+                else if (player.GetAxis("Vertical") < 0)
+                {
+                    speedInput = player.GetAxis("Vertical") * reverseAcceleration;
+                }
+
+                /*else
+                { 
+                    theRB.transform.localPosition = Vector3.zero;
+                    theRB.linearVelocity = Vector3.zero;
+                }*/
+
+                turnInput = player.GetAxis("Horizontal");
+
+                /*if (player.GetAxis("Vertical") != 0)
+                {
+                    transform.rotation = Quaternion.Euler(transform.rotation.eulerAngles + new Vector3(0f, turnInput * turnStrength * Time.deltaTime * Mathf.Sign(speedInput) * (theRB.linearVelocity.magnitude / maxSpeed), 0f));
+                }*/
+
+                if (resetCounter > 0)
+                {
+                    resetCounter -= Time.deltaTime;
+                }
+
+                if (player.GetButton("Reset") && resetCounter <= 0)
+                {
+                    ResetToTrack();
+                }
             }
 
             else
             {
-                skidSoundSFX.volume = Mathf.MoveTowards(
-                    skidSoundSFX.volume,
-                    0f,
-                    skidSFXFadeSpeed * Time.deltaTime
-                );
+                targetPoint.y = transform.position.y;
 
-                /*if (skidSoundSFX.volume <= 0.01f)
+                if (Vector3.Distance(transform.position, targetPoint) < aiReachPointRange)
                 {
-                    skidSoundSFX.Stop();
-                }*/
+                    SetNextAITarget();
+                }
+
+                Vector3 targetDir = targetPoint - transform.position;
+                float angle = Vector3.Angle(targetDir, transform.forward);
+
+                Vector3 localPos = transform.InverseTransformPoint(targetPoint);
+
+                if (localPos.x < 0f)
+                {
+                    angle = -angle;
+                }
+
+                turnInput = Mathf.Clamp(angle / aiMaxTurn, -1f, 1f);
+
+                if (Mathf.Abs(angle) < aiMaxTurn)
+                {
+                    aiSpeedInput = Mathf.MoveTowards(aiSpeedInput, 1f, aiAccelerateSpeed);
+                }
+
+                else
+                {
+                    aiSpeedInput = Mathf.MoveTowards(aiSpeedInput, aiTurnSpeed, aiAccelerateSpeed);
+                }
+
+                speedInput = aiSpeedInput * forwardAccel * aiSpeedMod;
+            }
+
+            frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn) - 180, frontLeftWheel.localRotation.eulerAngles.z);
+            //frontLeftWheel.localRotation = Quaternion.Euler(frontLeftWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput) - 180, frontLeftWheel.localRotation.eulerAngles.z);
+
+            frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (turnInput * maxWheelTurn), frontRightWheel.localRotation.eulerAngles.z);
+            //frontRightWheel.localRotation = Quaternion.Euler(frontRightWheel.localRotation.eulerAngles.x, (maxWheelTurn * turnInput), frontRightWheel.localRotation.eulerAngles.z);
+
+            //transform.position = theRB.position;
+
+            emissionRate = Mathf.MoveTowards(emissionRate, 0f, emissionFadeSpeed * Time.deltaTime);
+
+            if (grounded && (Mathf.Abs(turnInput) > .5f || (theRB.linearVelocity.magnitude < maxSpeed * .5f && theRB.linearVelocity.magnitude != 0)))
+            {
+                emissionRate = maxEmission;
+            }
+
+            if (theRB.linearVelocity.magnitude < 0.5f)
+            {
+                emissionRate = 0f;
+            }
+
+            for (int i = 0; i < dustTrail.Length; i++)
+            {
+                var emissionModule = dustTrail[i].emission;
+                emissionModule.rateOverTime = emissionRate;
+            }
+
+            if (engineSFX != null)
+            {
+                engineSFX.pitch = 1f + ((theRB.linearVelocity.magnitude / maxSpeed) * 1.5f);
+            }
+
+            if (skidSoundSFX != null)
+            {
+                if (grounded && Mathf.Abs(turnInput) > 0.5f && theRB.linearVelocity.magnitude >= .5f)
+                {
+                    if (!skidSoundSFX.isPlaying)
+                    {
+                        skidSoundSFX.Play();
+                    }
+                    skidSoundSFX.volume = 1f;
+                }
+
+                else
+                {
+                    skidSoundSFX.volume = Mathf.MoveTowards(
+                        skidSoundSFX.volume,
+                        0f,
+                        skidSFXFadeSpeed * Time.deltaTime
+                    );
+
+                    /*if (skidSoundSFX.volume <= 0.01f)
+                    {
+                        skidSoundSFX.Stop();
+                    }*/
+                }
             }
         }
     }

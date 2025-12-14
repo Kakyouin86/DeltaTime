@@ -6,8 +6,11 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/Osaka Studios.unity
+    guid: a49e33b2464f1bd4f912de45f3b88267
+  - enabled: 1
     path: Assets/Scenes/Stage 01.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    guid: 927dd5d4bc3454d46a089e69b0437263
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
